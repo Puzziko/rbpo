@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: "1БКС24044"
+
+server:
+  port: 8080
