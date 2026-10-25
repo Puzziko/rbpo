@@ -1,17 +1,14 @@
 package com.example.rbpo.controller;
 
-import com.example.rbpo.entity.Release;
+import com.example.rbpo.dto.ReleaseRequest;
+import com.example.rbpo.dto.ReleaseResponse;
 import com.example.rbpo.service.ReleaseService;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -19,63 +16,66 @@ import java.util.Map;
 public class ReleaseController {
 
     private final ReleaseService releaseService;
-    private final ObjectMapper objectMapper;
 
     @GetMapping
-    public ResponseEntity<List<Map<String, Object>>> getAll() {
-        List<Map<String, Object>> result = releaseService.getAll()
-                .entrySet()
-                .stream()
-                .map(entry -> toResponse(entry.getKey(), entry.getValue()))
-                .toList();
-
-        return ResponseEntity.ok(result);
+    public ResponseEntity<List<ReleaseResponse>> getAll() {
+        return ResponseEntity.ok(releaseService.getAll());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> getById(@PathVariable String id) {
+    public ResponseEntity<ReleaseResponse> getById(
+            @PathVariable Long id
+    ) {
         return releaseService.getById(id)
-                .map(release -> ResponseEntity.ok(toResponse(id, release)))
+                .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PostMapping
-    public ResponseEntity<Map<String, Object>> create(
-            @RequestBody Release release
+    public ResponseEntity<ReleaseResponse> create(
+            @RequestBody ReleaseRequest request
     ) {
-        String id = releaseService.create(release);
+        ReleaseResponse created = releaseService.create(request);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(toResponse(id, release));
+                .body(created);
     }
 
     @PatchMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> update(
-            @PathVariable String id,
-            @RequestBody Release patch
+    public ResponseEntity<ReleaseResponse> update(
+            @PathVariable Long id,
+            @RequestBody ReleaseRequest patch
     ) {
         return releaseService.update(id, patch)
-                .map(release -> ResponseEntity.ok(toResponse(id, release)))
+                .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable String id) {
-        releaseService.delete(id);
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        if (!releaseService.delete(id)) {
+            return ResponseEntity.notFound().build();
+        }
+
         return ResponseEntity.noContent().build();
     }
 
-    private Map<String, Object> toResponse(String id, Object resource) {
-        Map<String, Object> fields = objectMapper.convertValue(
-                resource,
-                new TypeReference<LinkedHashMap<String, Object>>() {}
-        );
+    @PostMapping("/{id}/approve")
+    public ResponseEntity<ReleaseResponse> approve(
+            @PathVariable Long id
+    ) {
+        return releaseService.approve(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
 
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("id", id);
-        response.putAll(fields);
-
-        return response;
+    @PostMapping("/{id}/publish")
+    public ResponseEntity<ReleaseResponse> publish(
+            @PathVariable Long id
+    ) {
+        return releaseService.publish(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 }

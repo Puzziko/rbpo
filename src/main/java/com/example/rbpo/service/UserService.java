@@ -1,71 +1,126 @@
 package com.example.rbpo.service;
 
+import com.example.rbpo.dto.UserRequest;
+import com.example.rbpo.dto.UserResponse;
 import com.example.rbpo.entity.User;
+import com.example.rbpo.repository.UserRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.List;
 import java.util.Objects;
-import java.util.UUID;
+import java.util.Optional;
 
 @Service
 public class UserService {
 
-    private final Map<String, User> users = new LinkedHashMap<>();
+    private final UserRepository userRepository;
 
-    private final SoftwareProductService softwareProductService;
-    private final DevelopmentTaskService developmentTaskService;
+    public UserService(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
 
-    public UserService(
-            SoftwareProductService softwareProductService,
-            DevelopmentTaskService developmentTaskService
+    @Transactional(readOnly = true)
+    public List<UserResponse> getAll() {
+        return userRepository.findAll()
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<UserResponse> getById(Long id) {
+        return userRepository.findById(id)
+                .map(this::toResponse);
+    }
+
+    @Transactional
+    public UserResponse create(UserRequest request) {
+        validateUsername(request.username());
+
+        String username = request.username().trim();
+
+        if (userRepository.existsByUsername(username)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Пользователь с таким username уже существует"
+            );
+        }
+
+        User user = new User();
+        user.setUsername(username);
+
+        return toResponse(userRepository.save(user));
+    }
+
+    @Transactional
+    public Optional<UserResponse> update(
+            Long id,
+            UserRequest patch
     ) {
-        this.softwareProductService = softwareProductService;
-        this.developmentTaskService = developmentTaskService;
-    }
+        Optional<User> found = userRepository.findById(id);
 
-    public Map<String, User> getAll() {
-        return users;
-    }
-
-    public Optional<User> getById(String id) {
-        return Optional.ofNullable(users.get(id));
-    }
-
-    public String create(User user) {
-        String id = UUID.randomUUID().toString();
-        users.put(id, user);
-        return id;
-    }
-
-    public Optional<User> update(String id, User patch) {
-        User user = users.get(id);
-
-        if (user == null) {
+        if (found.isEmpty()) {
             return Optional.empty();
         }
 
-        String oldUsername = user.getUsername();
+        User user = found.get();
 
-        if (patch.getUsername() != null) {
-            user.setUsername(patch.getUsername());
+        if (patch.username() != null) {
+            validateUsername(patch.username());
+
+            String newUsername = patch.username().trim();
+
+            if (!Objects.equals(user.getUsername(), newUsername)
+                    && userRepository.existsByUsername(newUsername)) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Пользователь с таким username уже существует"
+                );
+            }
+
+            user.setUsername(newUsername);
         }
 
-        if (!Objects.equals(oldUsername, user.getUsername())) {
-            softwareProductService.replaceResponsible(oldUsername, user);
-            developmentTaskService.replaceAssignee(oldUsername, user);
-        }
-
-        return Optional.of(user);
+        return Optional.of(
+                toResponse(userRepository.save(user))
+        );
     }
 
-    public void delete(String id) {
-        User user = users.remove(id);
+    @Transactional
+    public boolean delete(Long id) {
+        Optional<User> found = userRepository.findById(id);
 
-        if (user != null) {
-            softwareProductService.clearResponsible(user.getUsername());
-            developmentTaskService.clearAssignee(user.getUsername());
+        if (found.isEmpty()) {
+            return false;
+        }
+
+        userRepository.delete(found.get());
+        return true;
+    }
+
+    private UserResponse toResponse(User user) {
+        return new UserResponse(
+                user.getId(),
+                user.getUsername()
+        );
+    }
+
+    private void validateUsername(String username) {
+        if (username == null || username.isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Поле username не должно быть пустым"
+            );
+        }
+
+        if (username.trim().length() > 100) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Username не должен превышать 100 символов"
+            );
         }
     }
 }

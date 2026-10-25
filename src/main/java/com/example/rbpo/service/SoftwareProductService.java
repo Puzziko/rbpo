@@ -1,97 +1,172 @@
 package com.example.rbpo.service;
 
-import org.springframework.stereotype.Service;
+import com.example.rbpo.dto.SoftwareProductRequest;
+import com.example.rbpo.dto.SoftwareProductResponse;
 import com.example.rbpo.entity.SoftwareProduct;
+import com.example.rbpo.entity.User;
+import com.example.rbpo.repository.DevelopmentTaskRepository;
+import com.example.rbpo.repository.ReleaseRepository;
+import com.example.rbpo.repository.SoftwareProductRepository;
+import com.example.rbpo.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class SoftwareProductService {
 
-    private final Map<String, SoftwareProduct> products = new LinkedHashMap<>();
+    private final SoftwareProductRepository productRepository;
+    private final UserRepository userRepository;
+    private final DevelopmentTaskRepository taskRepository;
+    private final ReleaseRepository releaseRepository;
 
-    private final DevelopmentTaskService developmentTaskService;
-    private final ReleaseService releaseService;
+    @Transactional(readOnly = true)
+    public List<SoftwareProductResponse> getAll() {
+        return productRepository.findAll()
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
 
-    public SoftwareProductService(
-            DevelopmentTaskService developmentTaskService,
-            ReleaseService releaseService
+    @Transactional(readOnly = true)
+    public Optional<SoftwareProductResponse> getById(Long id) {
+        return productRepository.findById(id)
+                .map(this::toResponse);
+    }
+
+    @Transactional
+    public SoftwareProductResponse create(SoftwareProductRequest request) {
+        validateText(request.name(), "Название продукта", 200);
+        validateText(request.currentVersion(), "Текущая версия", 50);
+
+        String name = request.name().trim();
+
+        if (productRepository.existsByName(name)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Продукт с таким названием уже существует"
+            );
+        }
+
+        SoftwareProduct product = new SoftwareProduct();
+        product.setName(name);
+        product.setCurrentVersion(request.currentVersion().trim());
+        product.setResponsible(findResponsible(request.responsibleId()));
+
+        return toResponse(productRepository.save(product));
+    }
+
+    @Transactional
+    public Optional<SoftwareProductResponse> update(
+            Long id,
+            SoftwareProductRequest patch
     ) {
-        this.developmentTaskService = developmentTaskService;
-        this.releaseService = releaseService;
-    }
+        Optional<SoftwareProduct> found = productRepository.findById(id);
 
-    public Map<String, SoftwareProduct> getAll() {
-        return products;
-    }
-
-    public Optional<SoftwareProduct> getById(String id) {
-        return Optional.ofNullable(products.get(id));
-    }
-
-    public String create(SoftwareProduct product) {
-        String id = UUID.randomUUID().toString();
-        products.put(id, product);
-        return id;
-    }
-
-    public Optional<SoftwareProduct> update(String id, SoftwareProduct patch) {
-        SoftwareProduct product = products.get(id);
-
-        if (product == null) {
+        if (found.isEmpty()) {
             return Optional.empty();
         }
 
-        String oldName = product.getName();
+        SoftwareProduct product = found.get();
 
-        if (patch.getName() != null) {
-            product.setName(patch.getName());
+        if (patch.currentVersion() != null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Текущая версия изменяется только при публикации релиза"
+            );
         }
 
-        if (patch.getResponsible() != null) {
-            product.setResponsible(patch.getResponsible());
-        }
+        if (patch.name() != null) {
+            validateText(patch.name(), "Название продукта", 200);
 
-        if (patch.getCurrentVersion() != null) {
-            product.setCurrentVersion(patch.getCurrentVersion());
-        }
+            String newName = patch.name().trim();
 
-        if (!Objects.equals(oldName, product.getName())) {
-            developmentTaskService.replaceProduct(oldName, product);
-            releaseService.replaceProduct(oldName, product);
-        }
-
-        return Optional.of(product);
-    }
-
-    public void delete(String id) {
-        SoftwareProduct product = products.remove(id);
-
-        if (product != null) {
-            developmentTaskService.clearProduct(product.getName());
-            releaseService.clearProduct(product.getName());
-        }
-    }
-
-    public void clearResponsible(String username) {
-        products.values().forEach(product -> {
-            if (product.getResponsible() != null &&
-                    Objects.equals(product.getResponsible().getUsername(), username)) {
-                product.setResponsible(null);
+            if (!newName.equals(product.getName())
+                    && productRepository.existsByName(newName)) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Продукт с таким названием уже существует"
+                );
             }
-        });
+
+            product.setName(newName);
+        }
+
+        if (patch.currentVersion() != null) {
+            validateText(patch.currentVersion(), "Текущая версия", 50);
+            product.setCurrentVersion(patch.currentVersion().trim());
+        }
+
+        if (patch.responsibleId() != null) {
+            product.setResponsible(findResponsible(patch.responsibleId()));
+        }
+
+        return Optional.of(toResponse(productRepository.save(product)));
     }
 
-    public void replaceResponsible(String oldUsername, com.example.rbpo.entity.User newUser) {
-        products.values().forEach(product -> {
-            if (product.getResponsible() != null &&
-                    Objects.equals(product.getResponsible().getUsername(), oldUsername)) {
-                product.setResponsible(newUser);
-            }
-        });
+    @Transactional
+    public boolean delete(Long id) {
+        Optional<SoftwareProduct> found = productRepository.findById(id);
+
+        if (found.isEmpty()) {
+            return false;
+        }
+
+        if (taskRepository.existsByProduct_Id(id)
+                || releaseRepository.existsByProduct_Id(id)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Нельзя удалить продукт, пока с ним связаны задачи или релизы"
+            );
+        }
+
+        productRepository.delete(found.get());
+        return true;
+    }
+
+    private User findResponsible(Long responsibleId) {
+        if (responsibleId == null) {
+            return null;
+        }
+
+        return userRepository.findById(responsibleId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Ответственный пользователь не найден"
+                ));
+    }
+
+    private SoftwareProductResponse toResponse(SoftwareProduct product) {
+        User responsible = product.getResponsible();
+
+        return new SoftwareProductResponse(
+                product.getId(),
+                product.getName(),
+                responsible == null ? null : responsible.getId(),
+                responsible == null ? null : responsible.getUsername(),
+                product.getCurrentVersion()
+        );
+    }
+
+    private void validateText(String value, String field, int maxLength) {
+        if (value == null || value.isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    field + " не должно быть пустым"
+            );
+        }
+
+        if (value.trim().length() > maxLength) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    field + ": превышена максимальная длина " + maxLength
+            );
+        }
     }
 }

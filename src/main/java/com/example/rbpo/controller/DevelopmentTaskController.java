@@ -1,17 +1,15 @@
 package com.example.rbpo.controller;
 
-import com.example.rbpo.entity.DevelopmentTask;
+import com.example.rbpo.dto.DevelopmentTaskRequest;
+import com.example.rbpo.dto.DevelopmentTaskResponse;
 import com.example.rbpo.service.DevelopmentTaskService;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.example.rbpo.dto.TaskAssignmentRequest;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -19,63 +17,66 @@ import java.util.Map;
 public class DevelopmentTaskController {
 
     private final DevelopmentTaskService developmentTaskService;
-    private final ObjectMapper objectMapper;
 
     @GetMapping
-    public ResponseEntity<List<Map<String, Object>>> getAll() {
-        List<Map<String, Object>> result = developmentTaskService.getAll()
-                .entrySet()
-                .stream()
-                .map(entry -> toResponse(entry.getKey(), entry.getValue()))
-                .toList();
-
-        return ResponseEntity.ok(result);
+    public ResponseEntity<List<DevelopmentTaskResponse>> getAll() {
+        return ResponseEntity.ok(developmentTaskService.getAll());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> getById(@PathVariable String id) {
+    public ResponseEntity<DevelopmentTaskResponse> getById(
+            @PathVariable Long id
+    ) {
         return developmentTaskService.getById(id)
-                .map(task -> ResponseEntity.ok(toResponse(id, task)))
+                .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PostMapping
-    public ResponseEntity<Map<String, Object>> create(
-            @RequestBody DevelopmentTask task
+    public ResponseEntity<DevelopmentTaskResponse> create(
+            @RequestBody DevelopmentTaskRequest request
     ) {
-        String id = developmentTaskService.create(task);
+        DevelopmentTaskResponse created =
+                developmentTaskService.create(request);
 
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(toResponse(id, task));
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @PatchMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> update(
-            @PathVariable String id,
-            @RequestBody DevelopmentTask patch
+    public ResponseEntity<DevelopmentTaskResponse> update(
+            @PathVariable Long id,
+            @RequestBody DevelopmentTaskRequest patch
     ) {
         return developmentTaskService.update(id, patch)
-                .map(task -> ResponseEntity.ok(toResponse(id, task)))
+                .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable String id) {
-        developmentTaskService.delete(id);
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        if (!developmentTaskService.delete(id)) {
+            return ResponseEntity.notFound().build();
+        }
+
         return ResponseEntity.noContent().build();
     }
 
-    private Map<String, Object> toResponse(String id, Object resource) {
-        Map<String, Object> fields = objectMapper.convertValue(
-                resource,
-                new TypeReference<LinkedHashMap<String, Object>>() {}
-        );
+    @PostMapping("/{id}/assign")
+    public ResponseEntity<DevelopmentTaskResponse> assignTask(
+            @PathVariable Long id,
+            @RequestBody TaskAssignmentRequest request
+    ) {
+        return developmentTaskService.assignTask(id, request.assigneeId())
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
 
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("id", id);
-        response.putAll(fields);
-
-        return response;
+    @PostMapping("/{id}/ready")
+    public ResponseEntity<DevelopmentTaskResponse> markTaskReady(
+            @PathVariable Long id
+    ) {
+        return developmentTaskService.markTaskReady(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 }
