@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 import java.util.Locale;
@@ -29,6 +30,7 @@ public class ReleaseCheckService {
     private final ReleaseRepository releaseRepository;
 
     @Transactional(readOnly = true)
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     public List<ReleaseCheckResponse> getAll() {
         return checkRepository.findAll()
                 .stream()
@@ -37,12 +39,14 @@ public class ReleaseCheckService {
     }
 
     @Transactional(readOnly = true)
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     public Optional<ReleaseCheckResponse> getById(Long id) {
         return checkRepository.findById(id)
                 .map(this::toResponse);
     }
 
     @Transactional
+    @PreAuthorize("hasRole('ADMIN')")
     public ReleaseCheckResponse create(ReleaseCheckRequest request) {
         if (request.releaseId() == null) {
             throw new ResponseStatusException(
@@ -93,6 +97,7 @@ public class ReleaseCheckService {
     }
 
     @Transactional
+    @PreAuthorize("hasRole('ADMIN')")
     public Optional<ReleaseCheckResponse> update(
             Long id,
             ReleaseCheckRequest patch
@@ -173,7 +178,35 @@ public class ReleaseCheckService {
         );
     }
 
+
     @Transactional
+    @PreAuthorize("hasRole('ADMIN')")
+    public boolean delete(Long id) {
+        Optional<ReleaseCheck> found = checkRepository.findById(id);
+
+        if (found.isEmpty()) {
+            return false;
+        }
+
+        ReleaseCheck check = found.get();
+
+        if (!"PLANNED".equals(check.getRelease().getStatus())) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Нельзя удалять проверки согласованного или опубликованного релиза"
+            );
+        }
+
+        checkRepository.delete(check);
+        return true;
+    }
+
+
+    @Transactional
+    @PreAuthorize(
+            "hasRole('ADMIN') or "
+                    + "@authorizationService.isResponsibleForCheck(authentication, #p0)"
+    )
     public Optional<ReleaseCheckResponse> recordResult(
             Long id,
             String result
@@ -211,26 +244,6 @@ public class ReleaseCheckService {
         );
     }
 
-    @Transactional
-    public boolean delete(Long id) {
-        Optional<ReleaseCheck> found = checkRepository.findById(id);
-
-        if (found.isEmpty()) {
-            return false;
-        }
-
-        ReleaseCheck check = found.get();
-
-        if (!"PLANNED".equals(check.getRelease().getStatus())) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "Нельзя удалять проверки согласованного или опубликованного релиза"
-            );
-        }
-
-        checkRepository.delete(check);
-        return true;
-    }
 
     private Release findRelease(Long releaseId) {
         return releaseRepository.findById(releaseId)

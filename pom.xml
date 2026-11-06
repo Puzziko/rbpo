@@ -82,6 +82,11 @@
 			<scope>runtime</scope>
 		</dependency>
 
+		<!-- Аутентификация, авторизация и CSRF-защита -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
 	</dependencies>
 
 	<build>

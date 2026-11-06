@@ -1,0 +1,2479 @@
+{
+  "info": {
+    "_postman_id": "f32423c6-aded-4514-a556-73af32f826e3",
+    "name": "rbpo - lab4",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "59431036",
+    "_collection_link": "https://go.postman.co/collection/59431036-f32423c6-aded-4514-a556-73af32f826e3?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "00 — Authentication & Registration",
+      "item": [
+        {
+          "name": "01 — Get CSRF Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"CSRF token received\", function () {\n    pm.response.to.have.status(200);\n});\n\nconst data = pm.response.json();\n\npm.collectionVariables.set(\"csrfToken\", data.token);\npm.collectionVariables.set(\"csrfHeaderName\", data.headerName);\n\npm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/csrf",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "csrf"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "02 — Register User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"User registered successfully\", function () {\n    pm.response.to.have.status(201);\n});\n\nconst data = pm.response.json();\n\npm.collectionVariables.set(\"registeredUserId\", data.id);\n\npm.test(\"Response does not contain password or hash\", function () {\n    pm.expect(data).not.to.have.property(\"password\");\n    pm.expect(data).not.to.have.property(\"passwordHash\");\n});\n\npm.test(\"HTTP 201 Created\", function () {\n    pm.response.to.have.status(201);\n});"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const username = \"postman_reg_\" + Date.now();\n\npm.collectionVariables.set(\n    \"registrationUsername\",\n    username\n);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"{{registrationUsername}}\",\n    \"password\": \"{{registrationPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "01 — Admin Operations",
+      "item": [
+        {
+          "name": "01 — Get All Users",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Users retrieved\", function () {\n    pm.response.to.have.status(200);\n});\n\nconst users = pm.response.json();\n\nconst user = users.find(\n    u => u.username === pm.environment.get(\"userUsername\")\n);\n\nconst otherUser = users.find(\n    u => u.username === pm.environment.get(\"otherUsername\")\n);\n\npm.expect(user, \"USER account not found\").to.exist;\npm.expect(otherUser, \"Second USER account not found\").to.exist;\n\npm.collectionVariables.set(\"userId\", String(user.id));\npm.collectionVariables.set(\"otherUserId\", String(otherUser.id));\n\nconst suffix = Date.now().toString();\n\npm.collectionVariables.set(\"runSuffix\", suffix);\npm.collectionVariables.set(\n    \"releaseNumber\",\n    \"1.1.0-security-\" + suffix\n);\n\npm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "02 — Create User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"User created\", function () {\n    pm.response.to.have.status(201);\n});\n\npm.collectionVariables.set(\n    \"adminCrudUserId\",\n    String(pm.response.json().id)\n);\n\npm.test(\"HTTP 201 Created\", function () {\n    pm.response.to.have.status(201);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"postman_admin_{{runSuffix}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "03 — Get User By ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"postman_admin_updated_{{runSuffix}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{adminCrudUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{adminCrudUserId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "04 — Update User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"postman_admin_updated_{{runSuffix}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{adminCrudUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{adminCrudUserId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "05 — Delete User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204 No Content\", function () {\n    pm.response.to.have.status(204);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{adminCrudUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{adminCrudUserId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "06 — Create CRUD Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Product created\", function () {\n    pm.response.to.have.status(201);\n});\n\npm.collectionVariables.set(\n    \"adminCrudProductId\",\n    String(pm.response.json().id)\n);\n\npm.test(\"HTTP 201 Created\", function () {\n    pm.response.to.have.status(201);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Postman CRUD Product {{runSuffix}}\",\n    \"responsibleId\": {{userId}},\n    \"currentVersion\": \"1.0.0\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/software-products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "software-products"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "07 — Get All Products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/software-products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "software-products"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "08 — Get Product By ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/software-products/{{adminCrudProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "software-products",
+                "{{adminCrudProductId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "09 — Update Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Postman CRUD Product Updated {{runSuffix}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/software-products/{{adminCrudProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "software-products",
+                "{{adminCrudProductId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10 — Create CRUD Task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Task created\", function () {\n    pm.response.to.have.status(201);\n});\n\npm.collectionVariables.set(\n    \"adminCrudTaskId\",\n    String(pm.response.json().id)\n);\n\npm.test(\"HTTP 201 Created\", function () {\n    pm.response.to.have.status(201);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"productId\": {{adminCrudProductId}},\n    \"version\": \"0.1.0-crud\",\n    \"readinessStatus\": \"TODO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/development-tasks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "development-tasks"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "11 — Get All Tasks",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/development-tasks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "development-tasks"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "12 — Get Task By ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/development-tasks/{{adminCrudTaskId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "development-tasks",
+                "{{adminCrudTaskId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "13 — Update Task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"version\": \"0.1.1-crud\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/development-tasks/{{adminCrudTaskId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "development-tasks",
+                "{{adminCrudTaskId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "14 — Delete Task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204 No Content\", function () {\n    pm.response.to.have.status(204);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/development-tasks/{{adminCrudTaskId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "development-tasks",
+                "{{adminCrudTaskId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "15 — Create CRUD Release",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Release created\", function () {\n    pm.response.to.have.status(201);\n});\n\npm.collectionVariables.set(\n    \"adminCrudReleaseId\",\n    String(pm.response.json().id)\n);\n\npm.test(\"HTTP 201 Created\", function () {\n    pm.response.to.have.status(201);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"productId\": {{adminCrudProductId}},\n    \"number\": \"0.1.0-crud\",\n    \"status\": \"PLANNED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/releases",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "releases"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "16 — Get All Releases",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/releases",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "releases"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "17 — Get Release By ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/releases/{{adminCrudReleaseId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "releases",
+                "{{adminCrudReleaseId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "18 — Update Release",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"number\": \"0.1.1-crud\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/releases/{{adminCrudReleaseId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "releases",
+                "{{adminCrudReleaseId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "19 — Create CRUD Release Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Release check created\", function () {\n    pm.response.to.have.status(201);\n});\n\npm.collectionVariables.set(\n    \"adminCrudCheckId\",\n    String(pm.response.json().id)\n);\n\npm.test(\"HTTP 201 Created\", function () {\n    pm.response.to.have.status(201);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"releaseId\": {{adminCrudReleaseId}},\n    \"checkName\": \"Postman CRUD Check\",\n    \"mandatory\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/release-checks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "release-checks"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "20 — Get All Release Checks",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/release-checks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "release-checks"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "21 — Get Release Check By ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/release-checks/{{adminCrudCheckId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "release-checks",
+                "{{adminCrudCheckId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "22 — Update Release Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"checkName\": \"Postman CRUD Check Updated\",\n    \"mandatory\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/release-checks/{{adminCrudCheckId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "release-checks",
+                "{{adminCrudCheckId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "23 — Delete Release Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204 No Content\", function () {\n    pm.response.to.have.status(204);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/release-checks/{{adminCrudCheckId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "release-checks",
+                "{{adminCrudCheckId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "24 — Delete CRUD Release",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204 No Content\", function () {\n    pm.response.to.have.status(204);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/releases/{{adminCrudReleaseId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "releases",
+                "{{adminCrudReleaseId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "25 — Delete CRUD Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204 No Content\", function () {\n    pm.response.to.have.status(204);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/software-products/{{adminCrudProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "software-products",
+                "{{adminCrudProductId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "26 — Create Main Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Main product created\", function () {\n    pm.response.to.have.status(201);\n});\n\npm.collectionVariables.set(\n    \"productId\",\n    String(pm.response.json().id)\n);\n\npm.test(\"HTTP 201 Created\", function () {\n    pm.response.to.have.status(201);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Security Demo Product {{runSuffix}}\",\n    \"responsibleId\": {{userId}},\n    \"currentVersion\": \"1.0.0\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/software-products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "software-products"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "27 — Create Main Task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Main task created\", function () {\n    pm.response.to.have.status(201);\n});\n\npm.collectionVariables.set(\n    \"taskId\",\n    String(pm.response.json().id)\n);\n\npm.test(\"HTTP 201 Created\", function () {\n    pm.response.to.have.status(201);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"productId\": {{productId}},\n    \"version\": \"{{releaseNumber}}\",\n    \"readinessStatus\": \"TODO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/development-tasks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "development-tasks"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "28 — Create Foreign Task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Foreign task created\", function () {\n    pm.response.to.have.status(201);\n});\n\npm.collectionVariables.set(\n    \"foreignTaskId\",\n    String(pm.response.json().id)\n);\n\npm.test(\"HTTP 201 Created\", function () {\n    pm.response.to.have.status(201);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"productId\": {{productId}},\n    \"version\": \"0.9.0-foreign-{{runSuffix}}\",\n    \"readinessStatus\": \"TODO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/development-tasks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "development-tasks"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "29 — Admin Assigns Foreign Task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"assigneeId\": {{otherUserId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/development-tasks/{{foreignTaskId}}/assign",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "development-tasks",
+                "{{foreignTaskId}}",
+                "assign"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "30 — Create Foreign Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Foreign product created\", function () {\n    pm.response.to.have.status(201);\n});\n\npm.collectionVariables.set(\n    \"foreignProductId\",\n    String(pm.response.json().id)\n);\n\npm.test(\"HTTP 201 Created\", function () {\n    pm.response.to.have.status(201);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Foreign Security Product {{runSuffix}}\",\n    \"responsibleId\": {{otherUserId}},\n    \"currentVersion\": \"1.0.0\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/software-products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "software-products"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "31 — Create Foreign Release",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Foreign release created\", function () {\n    pm.response.to.have.status(201);\n});\n\npm.collectionVariables.set(\n    \"foreignReleaseId\",\n    String(pm.response.json().id)\n);\n\npm.test(\"HTTP 201 Created\", function () {\n    pm.response.to.have.status(201);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"productId\": {{foreignProductId}},\n    \"number\": \"0.9.0-foreign-{{runSuffix}}\",\n    \"status\": \"PLANNED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/releases",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "releases"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "32 — Create Main Release",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Main release created\", function () {\n    pm.response.to.have.status(201);\n});\n\npm.collectionVariables.set(\n    \"releaseId\",\n    String(pm.response.json().id)\n);\n\npm.test(\"HTTP 201 Created\", function () {\n    pm.response.to.have.status(201);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"productId\": {{productId}},\n    \"number\": \"{{releaseNumber}}\",\n    \"status\": \"PLANNED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/releases",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "releases"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "33 — Create Main Release Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Main release check created\", function () {\n    pm.response.to.have.status(201);\n});\n\npm.collectionVariables.set(\n    \"checkId\",\n    String(pm.response.json().id)\n);\n\npm.test(\"HTTP 201 Created\", function () {\n    pm.response.to.have.status(201);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"releaseId\": {{releaseId}},\n    \"checkName\": \"Security Demo Check {{runSuffix}}\",\n    \"mandatory\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/release-checks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "release-checks"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "auth": {
+        "type": "basic",
+        "basic": [
+          {
+            "key": "username",
+            "value": "{{adminUsername}}",
+            "type": "string"
+          },
+          {
+            "key": "password",
+            "value": "{{adminPassword}}",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "02 — User Operations",
+      "item": [
+        {
+          "name": "01 — Get All Products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/software-products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "software-products"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "02 — Get All Tasks",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/development-tasks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "development-tasks"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "03 — Get All Releases",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/releases",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "releases"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "04 — Get All Release Checks",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/release-checks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "release-checks"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "05 — Assign Self To Task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"assigneeId\": {{userId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/development-tasks/{{taskId}}/assign",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "development-tasks",
+                "{{taskId}}",
+                "assign"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "06 — Mark Own Task Ready",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/development-tasks/{{taskId}}/ready",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "development-tasks",
+                "{{taskId}}",
+                "ready"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "07 — Record Release Check Result",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"result\": \"PASSED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/release-checks/{{checkId}}/result",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "release-checks",
+                "{{checkId}}",
+                "result"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "08 — Approve Own Release",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/releases/{{releaseId}}/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "releases",
+                "{{releaseId}}",
+                "approve"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "09 — Publish Own Release",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/releases/{{releaseId}}/publish",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "releases",
+                "{{releaseId}}",
+                "publish"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "auth": {
+        "type": "basic",
+        "basic": [
+          {
+            "key": "username",
+            "value": "{{userUsername}}",
+            "type": "string"
+          },
+          {
+            "key": "password",
+            "value": "{{userPassword}}",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "03 — Access Denied Tests",
+      "item": [
+        {
+          "name": "USER — Forbidden",
+          "item": [
+            {
+              "name": "01 — USER Cannot Get Users",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 403 Forbidden\", function () {\n    pm.response.to.have.status(403);\n});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/users",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "02 — USER Cannot Create Product",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 403 Forbidden\", function () {\n    pm.response.to.have.status(403);\n});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "X-CSRF-TOKEN",
+                    "value": "{{csrfToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Forbidden Product {{runSuffix}}\",\n    \"responsibleId\": {{userId}},\n    \"currentVersion\": \"1.0.0\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/software-products",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "software-products"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "03 — USER Cannot Assign Another User",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 403 Forbidden\", function () {\n    pm.response.to.have.status(403);\n});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "X-CSRF-TOKEN",
+                    "value": "{{csrfToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"assigneeId\": {{otherUserId}}\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/development-tasks/{{foreignTaskId}}/assign",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "development-tasks",
+                    "{{foreignTaskId}}",
+                    "assign"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "04 — USER Cannot Complete Foreign Task",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 403 Forbidden\", function () {\n    pm.response.to.have.status(403);\n});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "X-CSRF-TOKEN",
+                    "value": "{{csrfToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/development-tasks/{{foreignTaskId}}/ready",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "development-tasks",
+                    "{{foreignTaskId}}",
+                    "ready"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "05 — USER Cannot Create Release Check",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 403 Forbidden\", function () {\n    pm.response.to.have.status(403);\n});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "X-CSRF-TOKEN",
+                    "value": "{{csrfToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"releaseId\": {{foreignReleaseId}},\n    \"checkName\": \"Forbidden Check {{runSuffix}}\",\n    \"mandatory\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/release-checks",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "release-checks"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "06 — USER Cannot Approve Foreign Release",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 403 Forbidden\", function () {\n    pm.response.to.have.status(403);\n});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "X-CSRF-TOKEN",
+                    "value": "{{csrfToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/releases/{{foreignReleaseId}}/approve",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "releases",
+                    "{{foreignReleaseId}}",
+                    "approve"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "07 — USER Cannot Publish Foreign Release",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 403 Forbidden\", function () {\n    pm.response.to.have.status(403);\n});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "X-CSRF-TOKEN",
+                    "value": "{{csrfToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/releases/{{foreignReleaseId}}/publish",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "releases",
+                    "{{foreignReleaseId}}",
+                    "publish"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ],
+          "auth": {
+            "type": "basic",
+            "basic": [
+              {
+                "key": "username",
+                "value": "{{userUsername}}",
+                "type": "string"
+              },
+              {
+                "key": "password",
+                "value": "{{userPassword}}",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Anonymous — Unauthorized",
+          "item": [
+            {
+              "name": "08 — Anonymous Cannot Access Products",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"HTTP 401 Unauthorized\", function () {\n    pm.response.to.have.status(401);\n});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/software-products",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "software-products"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 — CSRF Tests",
+      "item": [
+        {
+          "name": "01 — POST Without CSRF Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401 Unauthorized\", function () {\n    pm.response.to.have.status(401);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"CSRF Test Product {{runSuffix}}\",\n    \"responsibleId\": {{userId}},\n    \"currentVersion\": \"1.0.0\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/software-products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "software-products"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "02 — POST With Invalid CSRF Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401 Unauthorized\", function () {\n    pm.response.to.have.status(401);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "invlaid-token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"CSRF Test Product {{runSuffix}}\",\n    \"responsibleId\": {{userId}},\n    \"currentVersion\": \"1.0.0\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/software-products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "software-products"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "03 — POST With Valid CSRF Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Request with valid CSRF token succeeded\", function () {\n    pm.response.to.have.status(201);\n});\n\npm.collectionVariables.set(\n    \"csrfTestProductId\",\n    String(pm.response.json().id)\n);\n\npm.test(\"HTTP 201 Created\", function () {\n    pm.response.to.have.status(201);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"CSRF Test Product {{runSuffix}}\",\n    \"responsibleId\": {{userId}},\n    \"currentVersion\": \"1.0.0\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/software-products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "software-products"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "04 — DELETE With Valid CSRF Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204 No Content\", function () {\n    pm.response.to.have.status(204);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/software-products/{{csrfTestProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "software-products",
+                "{{csrfTestProductId}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "auth": {
+        "type": "basic",
+        "basic": [
+          {
+            "key": "password",
+            "value": "{{adminPassword}}",
+            "type": "string"
+          },
+          {
+            "key": "username",
+            "value": "{{adminUsername}}",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": ""
+    },
+    {
+      "key": "csrfToken",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "otherUserId",
+      "value": ""
+    },
+    {
+      "key": "productId",
+      "value": ""
+    },
+    {
+      "key": "taskId",
+      "value": ""
+    },
+    {
+      "key": "foreignTaskId",
+      "value": ""
+    },
+    {
+      "key": "releaseId",
+      "value": ""
+    },
+    {
+      "key": "checkId",
+      "value": ""
+    },
+    {
+      "key": "foreignProductId",
+      "value": ""
+    },
+    {
+      "key": "foreignReleaseId",
+      "value": ""
+    },
+    {
+      "key": "adminCrudProductId",
+      "value": ""
+    },
+    {
+      "key": "csrfHeaderName",
+      "value": ""
+    },
+    {
+      "key": "registeredUserId",
+      "value": ""
+    },
+    {
+      "key": "runSuffix",
+      "value": ""
+    },
+    {
+      "key": "adminCrudUserId",
+      "value": ""
+    },
+    {
+      "key": "adminCrudTaskId",
+      "value": ""
+    },
+    {
+      "key": "adminCrudReleaseId",
+      "value": ""
+    },
+    {
+      "key": "adminCrudCheckId",
+      "value": ""
+    },
+    {
+      "key": "releaseNumber",
+      "value": ""
+    },
+    {
+      "key": "csrfTestProductId",
+      "value": ""
+    },
+    {
+      "key": "registrationPassword",
+      "value": ""
+    },
+    {
+      "key": "registrationUsername",
+      "value": ""
+    }
+  ]
+}

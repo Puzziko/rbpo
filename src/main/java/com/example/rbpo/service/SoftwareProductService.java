@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 import java.util.Optional;
@@ -26,6 +27,7 @@ public class SoftwareProductService {
     private final DevelopmentTaskRepository taskRepository;
     private final ReleaseRepository releaseRepository;
 
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @Transactional(readOnly = true)
     public List<SoftwareProductResponse> getAll() {
         return productRepository.findAll()
@@ -34,12 +36,14 @@ public class SoftwareProductService {
                 .toList();
     }
 
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @Transactional(readOnly = true)
     public Optional<SoftwareProductResponse> getById(Long id) {
         return productRepository.findById(id)
                 .map(this::toResponse);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     public SoftwareProductResponse create(SoftwareProductRequest request) {
         validateText(request.name(), "Название продукта", 200);
@@ -62,6 +66,7 @@ public class SoftwareProductService {
         return toResponse(productRepository.save(product));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     public Optional<SoftwareProductResponse> update(
             Long id,
@@ -110,6 +115,7 @@ public class SoftwareProductService {
         return Optional.of(toResponse(productRepository.save(product)));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     public boolean delete(Long id) {
         Optional<SoftwareProduct> found = productRepository.findById(id);

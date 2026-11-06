@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 import java.util.Locale;
@@ -32,6 +33,7 @@ public class DevelopmentTaskService {
     private final UserRepository userRepository;
     private final ReleaseRepository releaseRepository;
 
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @Transactional(readOnly = true)
     public List<DevelopmentTaskResponse> getAll() {
         return taskRepository.findAll()
@@ -40,6 +42,7 @@ public class DevelopmentTaskService {
                 .toList();
     }
 
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @Transactional(readOnly = true)
     public Optional<DevelopmentTaskResponse> getById(Long id) {
         return taskRepository.findById(id)
@@ -47,6 +50,7 @@ public class DevelopmentTaskService {
     }
 
     // CRUD: создаём только новую задачу в статусе TODO без исполнителя.
+    @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     public DevelopmentTaskResponse create(DevelopmentTaskRequest request) {
         if (request.productId() == null) {
@@ -91,6 +95,7 @@ public class DevelopmentTaskService {
     }
 
     // CRUD: редактируем сведения о задаче, но не её состояние.
+    @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     public Optional<DevelopmentTaskResponse> update(
             Long id,
@@ -144,6 +149,7 @@ public class DevelopmentTaskService {
         return Optional.of(toResponse(taskRepository.save(task)));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     public boolean delete(Long id) {
         Optional<DevelopmentTask> found = taskRepository.findById(id);
@@ -159,6 +165,10 @@ public class DevelopmentTaskService {
     }
 
     // Бизнес-операция 1: назначение разработчика.
+    @PreAuthorize(
+            "hasRole('ADMIN') or "
+                    + "@authorizationService.canSelfAssign(authentication, #p0, #p1)"
+    )
     @Transactional
     public Optional<DevelopmentTaskResponse> assignTask(
             Long taskId,
@@ -196,6 +206,13 @@ public class DevelopmentTaskService {
                         "Пользователь для назначения не найден"
                 ));
 
+        if (!"ACTIVE".equals(assignee.getAccountStatus())) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Нельзя назначить задачу неактивному пользователю"
+            );
+        }
+
         task.setAssignee(assignee);
 
         // Назначение исполнителя переводит новую задачу в работу.
@@ -209,6 +226,10 @@ public class DevelopmentTaskService {
     }
 
     // Бизнес-операция 2: подтвердить готовность задачи.
+    @PreAuthorize(
+            "hasRole('ADMIN') or "
+                    + "@authorizationService.isAssignedToCurrentUser(authentication, #p0)"
+    )
     @Transactional
     public Optional<DevelopmentTaskResponse> markTaskReady(Long taskId) {
         Optional<DevelopmentTask> found =

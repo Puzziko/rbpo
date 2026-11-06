@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -29,6 +30,7 @@ public class ReleaseService {
     private final DevelopmentTaskRepository taskRepository;
     private final ReleaseCheckRepository checkRepository;
 
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @Transactional(readOnly = true)
     public List<ReleaseResponse> getAll() {
         return releaseRepository.findAll()
@@ -37,6 +39,7 @@ public class ReleaseService {
                 .toList();
     }
 
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @Transactional(readOnly = true)
     public Optional<ReleaseResponse> getById(Long id) {
         return releaseRepository.findById(id)
@@ -44,6 +47,7 @@ public class ReleaseService {
     }
 
     // Создание релиза: только начальный статус PLANNED.
+    @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     public ReleaseResponse create(ReleaseRequest request) {
         if (request.productId() == null) {
@@ -93,6 +97,7 @@ public class ReleaseService {
 
     // Редактирование реквизитов возможно только для PLANNED.
     // Статус и дату публикации меняют бизнес-операции.
+    @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     public Optional<ReleaseResponse> update(
             Long id,
@@ -154,6 +159,7 @@ public class ReleaseService {
         );
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     public boolean delete(Long id) {
         Optional<Release> found = releaseRepository.findById(id);
@@ -176,6 +182,10 @@ public class ReleaseService {
     }
 
     // Бизнес-операция 4: согласовать релиз.
+    @PreAuthorize(
+            "hasRole('ADMIN') or "
+                    + "@authorizationService.isResponsibleForRelease(authentication, #p0)"
+    )
     @Transactional
     public Optional<ReleaseResponse> approve(Long id) {
         Optional<Release> found = releaseRepository.findById(id);
@@ -203,6 +213,10 @@ public class ReleaseService {
     }
 
     // Бизнес-операция 5: опубликовать согласованный релиз.
+    @PreAuthorize(
+            "hasRole('ADMIN') or "
+                    + "@authorizationService.isResponsibleForRelease(authentication, #p0)"
+    )
     @Transactional
     public Optional<ReleaseResponse> publish(Long id) {
         Optional<Release> found = releaseRepository.findById(id);

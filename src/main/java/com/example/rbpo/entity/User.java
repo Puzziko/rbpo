@@ -23,4 +23,13 @@ public class User {
 
     @Column(name = "username", nullable = false, unique = true, length = 100)
     private String username;
+
+    @Column(name = "password_hash", length = 100)
+    private String passwordHash;
+
+    @Column(name = "role", nullable = false, length = 20)
+    private String role = "USER";
+
+    @Column(name = "account_status", nullable = false, length = 20)
+    private String accountStatus = "DISABLED";
 }
