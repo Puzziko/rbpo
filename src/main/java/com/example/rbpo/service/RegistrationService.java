@@ -1,7 +1,7 @@
 package com.example.rbpo.service;
 
 import com.example.rbpo.dto.RegistrationRequest;
-import com.example.rbpo.dto.UserResponse;
+import com.example.rbpo.dto.TokenResponse;
 import com.example.rbpo.entity.User;
 import com.example.rbpo.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,9 +19,12 @@ public class RegistrationService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final TokenService tokenService;
 
+    // Создание учётной записи и выдача пары токенов — одна транзакция:
+    // если сессия не сохранилась, пользователь тоже не создаётся.
     @Transactional
-    public UserResponse register(RegistrationRequest request) {
+    public TokenResponse register(RegistrationRequest request) {
         if (request == null) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -51,8 +54,8 @@ public class RegistrationService {
 
         User saved = userRepository.save(user);
 
-        // Не возвращаем пароль или его хеш клиенту.
-        return new UserResponse(saved.getId(), saved.getUsername());
+        // Не возвращаем пароль или его хеш клиенту, только пару токенов.
+        return tokenService.issueTokenPair(saved, request.deviceId());
     }
 
     private String validateUsername(String username) {

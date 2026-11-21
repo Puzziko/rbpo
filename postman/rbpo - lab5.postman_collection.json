@@ -1,7 +1,7 @@
 {
   "info": {
     "_postman_id": "f32423c6-aded-4514-a556-73af32f826e3",
-    "name": "rbpo - lab4",
+    "name": "rbpo - lab5",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "59431036",
     "_collection_link": "https://go.postman.co/collection/59431036-f32423c6-aded-4514-a556-73af32f826e3?source=collection_link"
@@ -48,7 +48,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"User registered successfully\", function () {\n    pm.response.to.have.status(201);\n});\n\nconst data = pm.response.json();\n\npm.collectionVariables.set(\"registeredUserId\", data.id);\n\npm.test(\"Response does not contain password or hash\", function () {\n    pm.expect(data).not.to.have.property(\"password\");\n    pm.expect(data).not.to.have.property(\"passwordHash\");\n});\n\npm.test(\"HTTP 201 Created\", function () {\n    pm.response.to.have.status(201);\n});"
+                  "pm.test(\"User registered successfully\", function () {\n    pm.response.to.have.status(201);\n});\nconst data = pm.response.json();\npm.test(\"Response contains token pair\", function () {\n    pm.expect(data).to.have.property(\"accessToken\");\n    pm.expect(data).to.have.property(\"refreshToken\");\n});\npm.test(\"Response does not contain password or hash\", function () {\n    pm.expect(data).not.to.have.property(\"password\");\n    pm.expect(data).not.to.have.property(\"passwordHash\");\n});"
                 ]
               }
             },
@@ -2196,7 +2196,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 401 Unauthorized\", function () {\n    pm.response.to.have.status(401);\n});"
+                  "pm.test(\"HTTP 403 Forbidden\", function () {\n    pm.response.to.have.status(403);\n});"
                 ]
               }
             }
@@ -2239,7 +2239,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 401 Unauthorized\", function () {\n    pm.response.to.have.status(401);\n});"
+                  "pm.test(\"HTTP 403 Forbidden\", function () {\n    pm.response.to.have.status(403);\n});"
                 ]
               }
             }
@@ -2380,6 +2380,1310 @@
           }
         ]
       }
+    },
+    {
+      "name": "05 — JWT Sessions",
+      "item": [
+        {
+          "name": "01 — Get CSRF Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});\n\nconst data = pm.response.json();\n\npm.collectionVariables.set(\"csrfToken\", data.token);\npm.collectionVariables.set(\"csrfHeaderName\", data.headerName);\n\npm.test(\"CSRF token received\", function () {\n    pm.expect(data.token).to.be.a(\"string\").and.not.empty;\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/csrf",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "csrf"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "02 — Register With Token Pair",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"jwtUsername\", \"jwt_user_\" + Date.now());\npm.collectionVariables.set(\"jwtPassword\", \"JwtTest#2026Strong\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function decodeJwt(token) {\n    const part = token.split(\".\")[1].replace(/-/g, \"+\").replace(/_/g, \"/\");\n    const padded = part + \"=\".repeat((4 - part.length % 4) % 4);\n    return JSON.parse(atob(padded));\n}\n\npm.test(\"HTTP 201 Created\", function () {\n    pm.response.to.have.status(201);\n});\n\nconst data = pm.response.json();\n\npm.test(\"Response contains token pair\", function () {\n    pm.expect(data.accessToken).to.be.a(\"string\").and.not.empty;\n    pm.expect(data.refreshToken).to.be.a(\"string\").and.not.empty;\n});\n\npm.test(\"Response does not contain password or hash\", function () {\n    pm.expect(data).not.to.have.property(\"password\");\n    pm.expect(data).not.to.have.property(\"passwordHash\");\n});\n\nconst access = decodeJwt(data.accessToken);\nconst refresh = decodeJwt(data.refreshToken);\n\npm.test(\"Access token claims are correct\", function () {\n    pm.expect(access.type).to.eql(\"access\");\n    pm.expect(access.sub).to.eql(pm.collectionVariables.get(\"jwtUsername\"));\n    pm.expect(access.jti).to.be.a(\"string\").and.not.empty;\n});\n\npm.test(\"Refresh token claims are correct\", function () {\n    pm.expect(refresh.type).to.eql(\"refresh\");\n    pm.expect(refresh.sub).to.eql(pm.collectionVariables.get(\"jwtUsername\"));\n    pm.expect(refresh.jti).to.not.eql(access.jti);\n});\n\npm.test(\"Token lifetimes match application.yml\", function () {\n    pm.expect(access.exp - access.iat).to.eql(900);\n    pm.expect(refresh.exp - refresh.iat).to.eql(604800);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"{{jwtUsername}}\",\n    \"password\": \"{{jwtPassword}}\",\n    \"deviceId\": \"postman-register\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "03 — Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function decodeJwt(token) {\n    const part = token.split(\".\")[1].replace(/-/g, \"+\").replace(/_/g, \"/\");\n    const padded = part + \"=\".repeat((4 - part.length % 4) % 4);\n    return JSON.parse(atob(padded));\n}\n\npm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});\n\nconst data = pm.response.json();\n\npm.test(\"Response contains token pair\", function () {\n    pm.expect(data.accessToken).to.be.a(\"string\").and.not.empty;\n    pm.expect(data.refreshToken).to.be.a(\"string\").and.not.empty;\n});\n\nconst access = decodeJwt(data.accessToken);\nconst refresh = decodeJwt(data.refreshToken);\n\npm.test(\"Token types are correct\", function () {\n    pm.expect(access.type).to.eql(\"access\");\n    pm.expect(refresh.type).to.eql(\"refresh\");\n});\n\npm.test(\"Access and refresh have different jti\", function () {\n    pm.expect(access.jti).to.not.eql(refresh.jti);\n});\n\npm.collectionVariables.set(\"accessToken\", data.accessToken);\npm.collectionVariables.set(\"refreshToken\", data.refreshToken);\n\nconsole.log(\"refresh tail:\", data.refreshToken.slice(-10));\nconsole.log(\"refresh exp (UTC):\", new Date(refresh.exp * 1000).toISOString());"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"{{jwtUsername}}\",\n    \"password\": \"{{jwtPassword}}\",\n    \"deviceId\": \"postman-login\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "04 — Access Protected Endpoint",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});\n\npm.test(\"Response is a list\", function () {\n    pm.expect(pm.response.json()).to.be.an(\"array\");\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/software-products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "software-products"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "05 — Refresh Token Pair",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"oldAccessToken\", pm.collectionVariables.get(\"accessToken\"));\npm.collectionVariables.set(\"oldRefreshToken\", pm.collectionVariables.get(\"refreshToken\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function decodeJwt(token) {\n    const part = token.split(\".\")[1].replace(/-/g, \"+\").replace(/_/g, \"/\");\n    const padded = part + \"=\".repeat((4 - part.length % 4) % 4);\n    return JSON.parse(atob(padded));\n}\n\npm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});\n\nconst data = pm.response.json();\n\npm.test(\"Request had no Authorization header\", function () {\n    pm.expect(pm.request.headers.has(\"Authorization\")).to.be.false;\n});\n\npm.test(\"New pair differs from previous\", function () {\n    pm.expect(data.accessToken).to.not.eql(pm.collectionVariables.get(\"oldAccessToken\"));\n    pm.expect(data.refreshToken).to.not.eql(pm.collectionVariables.get(\"oldRefreshToken\"));\n});\n\npm.test(\"New tokens have new jti and correct types\", function () {\n    const newAccess = decodeJwt(data.accessToken);\n    const newRefresh = decodeJwt(data.refreshToken);\n    const oldRefresh = decodeJwt(pm.collectionVariables.get(\"oldRefreshToken\"));\n    pm.expect(newAccess.type).to.eql(\"access\");\n    pm.expect(newRefresh.type).to.eql(\"refresh\");\n    pm.expect(newRefresh.jti).to.not.eql(oldRefresh.jti);\n});\n\npm.collectionVariables.set(\"accessToken\", data.accessToken);\npm.collectionVariables.set(\"refreshToken\", data.refreshToken);\n\nconsole.log(\"new refresh tail:\", data.refreshToken.slice(-10));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "06 — Access Protected Endpoint With New Access Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});\n\npm.test(\"Response is a list\", function () {\n    pm.expect(pm.response.json()).to.be.an(\"array\");\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/software-products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "software-products"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "07 — Reuse Old Refresh Token (Revokes Session)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401 Unauthorized\", function () {\n    pm.response.to.have.status(401);\n});\n\nconst text = pm.response.text();\n\npm.test(\"No new token pair issued\", function () {\n    pm.expect(text).to.not.include(\"accessToken\");\n    pm.expect(text).to.not.include(\"refreshToken\");\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"refreshToken\": \"{{oldRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "08 — Reuse Revoked Token Again",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401 Unauthorized\", function () {\n    pm.response.to.have.status(401);\n});\n\nconst text = pm.response.text();\n\npm.test(\"No new token pair issued\", function () {\n    pm.expect(text).to.not.include(\"accessToken\");\n    pm.expect(text).to.not.include(\"refreshToken\");\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"refreshToken\": \"{{oldRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "09 — Refresh With Current Token After Revocation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200 OK\", function () {\n    pm.response.to.have.status(200);\n});\n\nconst data = pm.response.json();\n\npm.test(\"Chain is not revoked: new pair issued\", function () {\n    pm.expect(data.accessToken).to.be.a(\"string\").and.not.empty;\n    pm.expect(data.refreshToken).to.be.a(\"string\").and.not.empty;\n});\n\npm.collectionVariables.set(\"accessToken\", data.accessToken);\npm.collectionVariables.set(\"refreshToken\", data.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"refreshToken\": \"{{refreshToken}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "06 — JWT Negative Tests",
+      "item": [
+        {
+          "name": "01 — Login Wrong Password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401 Unauthorized\", function () {\n    pm.response.to.have.status(401);\n});\n\npm.test(\"No token pair in response\", function () {\n    pm.expect(pm.response.text()).to.not.include(\"accessToken\");\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"username\": \"{{jwtUsername}}\", \"password\": \"WrongPassword#999\", \"deviceId\": \"postman-login\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "02 — Login Unknown User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401 Unauthorized\", function () {\n    pm.response.to.have.status(401);\n});\n\npm.test(\"No token pair in response\", function () {\n    pm.expect(pm.response.text()).to.not.include(\"accessToken\");\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"username\": \"no_such_user_{{$timestamp}}\", \"password\": \"WrongPassword#999\", \"deviceId\": \"postman-login\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "03 — Login Empty Username",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400 Bad Request\", function () {\n    pm.response.to.have.status(400);\n});\n\npm.test(\"No token pair in response\", function () {\n    pm.expect(pm.response.text()).to.not.include(\"accessToken\");\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"username\": \"\", \"password\": \"{{jwtPassword}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "04 — Login Missing Password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403 Forbidden\", function () {\n    pm.response.to.have.status(403);\n});\n\npm.test(\"No token pair in response\", function () {\n    pm.expect(pm.response.text()).to.not.include(\"accessToken\");\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"username\": \"{{jwtUsername}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "05 — Login Without CSRF Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403 Forbidden\", function () {\n    pm.response.to.have.status(403);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"username\": \"{{jwtUsername}}\", \"password\": \"{{jwtPassword}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "06 — Refresh Empty Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400 Bad Request\", function () {\n    pm.response.to.have.status(400);\n});\n\npm.test(\"No token pair in response\", function () {\n    pm.expect(pm.response.text()).to.not.include(\"accessToken\");\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"refreshToken\": \"\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "07 — Refresh Missing Field",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400 Bad Request\", function () {\n    pm.response.to.have.status(400);\n});\n\npm.test(\"No token pair in response\", function () {\n    pm.expect(pm.response.text()).to.not.include(\"accessToken\");\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"refreshToken\": \"\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "08 — Refresh Malformed Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401 Unauthorized\", function () {\n    pm.response.to.have.status(401);\n});\n\npm.test(\"No token pair in response\", function () {\n    pm.expect(pm.response.text()).to.not.include(\"accessToken\");\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"refreshToken\": \"not.a.jwt\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "09 — Refresh With Access Token Instead Of Refresh",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401 Unauthorized\", function () {\n    pm.response.to.have.status(401);\n});\n\npm.test(\"No token pair in response\", function () {\n    pm.expect(pm.response.text()).to.not.include(\"accessToken\");\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"refreshToken\": \"{{accessToken}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10 — Refresh Tampered Signature",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const parts = pm.collectionVariables.get(\"refreshToken\").split(\".\");\nparts[2] = (parts[2][0] === \"A\" ? \"B\" : \"A\") + parts[2].slice(1);\npm.collectionVariables.set(\"tamperedRefreshToken\", parts.join(\".\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401 Unauthorized\", function () {\n    pm.response.to.have.status(401);\n});\n\npm.test(\"No token pair in response\", function () {\n    pm.expect(pm.response.text()).to.not.include(\"accessToken\");\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"refreshToken\": \"{{tamperedRefreshToken}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "11 — Refresh Unsigned Token (alg none)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "function b64url(obj) {\n    return btoa(JSON.stringify(obj))\n        .replace(/\\+/g, \"-\").replace(/\\//g, \"_\").replace(/=+$/, \"\");\n}\nconst now = Math.floor(Date.now() / 1000);\nconst token = b64url({ alg: \"none\", typ: \"JWT\" }) + \".\" +\n    b64url({\n        sub: pm.collectionVariables.get(\"jwtUsername\"),\n        jti: \"forged-jti\",\n        type: \"refresh\",\n        iat: now,\n        exp: now + 3600\n    }) + \".\";\npm.collectionVariables.set(\"unsignedRefreshToken\", token);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401 Unauthorized\", function () {\n    pm.response.to.have.status(401);\n});\n\npm.test(\"No token pair in response\", function () {\n    pm.expect(pm.response.text()).to.not.include(\"accessToken\");\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"refreshToken\": \"{{unsignedRefreshToken}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "refresh"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "12 — Register Duplicate Username",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409 Conflict\", function () {\n    pm.response.to.have.status(409);\n});\n\npm.test(\"No token pair in response\", function () {\n    pm.expect(pm.response.text()).to.not.include(\"accessToken\");\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"username\": \"{{jwtUsername}}\", \"password\": \"{{jwtPassword}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "13 — Register Weak Password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400 Bad Request\", function () {\n    pm.response.to.have.status(400);\n});\n\npm.test(\"No token pair in response\", function () {\n    pm.expect(pm.response.text()).to.not.include(\"accessToken\");\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"username\": \"jwt_weak_{{$timestamp}}\", \"password\": \"short\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "14 — Register Empty Username",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400 Bad Request\", function () {\n    pm.response.to.have.status(400);\n});\n\npm.test(\"No token pair in response\", function () {\n    pm.expect(pm.response.text()).to.not.include(\"accessToken\");\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"username\": \"\", \"password\": \"{{jwtPassword}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "15 — Register Role ADMIN Is Ignored",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"escalationUsername\", \"jwt_admin_\" + Date.now());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201 Created\", function () {\n    pm.response.to.have.status(201);\n});\n\nconst data = pm.response.json();\n\npm.test(\"Token pair received\", function () {\n    pm.expect(data.accessToken).to.be.a(\"string\").and.not.empty;\n});\n\npm.collectionVariables.set(\"escalationAccessToken\", data.accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-TOKEN",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"{{escalationUsername}}\",\n    \"password\": \"{{jwtPassword}}\",\n    \"role\": \"ADMIN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "16 — Escalated User Cannot Get Users",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 403 Forbidden\", function () {\n    pm.response.to.have.status(403);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{escalationAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "17 — Protected Endpoint Without Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401 Unauthorized\", function () {\n    pm.response.to.have.status(401);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/software-products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "software-products"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "18 — Protected Endpoint With Refresh Token As Bearer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401 Unauthorized\", function () {\n    pm.response.to.have.status(401);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{refreshToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/software-products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "software-products"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "19 — Protected Endpoint With Malformed Bearer Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401 Unauthorized\", function () {\n    pm.response.to.have.status(401);\n});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "abc.def.ghi",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/software-products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "software-products"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
     }
   ],
   "variable": [
@@ -2473,6 +3777,46 @@
     },
     {
       "key": "registrationUsername",
+      "value": ""
+    },
+    {
+      "key": "jwtUsername",
+      "value": ""
+    },
+    {
+      "key": "jwtPassword",
+      "value": ""
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "oldAccessToken",
+      "value": ""
+    },
+    {
+      "key": "oldRefreshToken",
+      "value": ""
+    },
+    {
+      "key": "escalationUsername",
+      "value": ""
+    },
+    {
+      "key": "escalationAccessToken",
+      "value": ""
+    },
+    {
+      "key": "tamperedRefreshToken",
+      "value": ""
+    },
+    {
+      "key": "unsignedRefreshToken",
       "value": ""
     }
   ]

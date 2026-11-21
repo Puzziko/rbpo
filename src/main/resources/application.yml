@@ -16,3 +16,11 @@ spring:
 
 server:
   port: 8080
+
+jwt:
+  # Ключ HS256 задаётся переменной окружения, длина не менее 32 байт.
+  secret: ${JWT_SECRET}
+  # Время жизни access-токена: 15 минут.
+  access-token-ttl-seconds: 900
+  # Время жизни refresh-токена: 7 суток.
+  refresh-token-ttl-seconds: 604800

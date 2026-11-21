@@ -1,8 +1,12 @@
 package com.example.rbpo.controller;
 
+import com.example.rbpo.dto.LoginRequest;
+import com.example.rbpo.dto.RefreshRequest;
 import com.example.rbpo.dto.RegistrationRequest;
-import com.example.rbpo.dto.UserResponse;
+import com.example.rbpo.dto.TokenResponse;
+import com.example.rbpo.service.AuthService;
 import com.example.rbpo.service.RegistrationService;
+import com.example.rbpo.service.TokenService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +21,8 @@ import java.util.Map;
 public class AuthController {
 
     private final RegistrationService registrationService;
+    private final AuthService authService;
+    private final TokenService tokenService;
 
     @GetMapping("/csrf")
     public Map<String, String> getCsrfToken(CsrfToken csrfToken) {
@@ -28,13 +34,29 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<UserResponse> register(
+    public ResponseEntity<TokenResponse> register(
             @RequestBody RegistrationRequest request
     ) {
-        UserResponse response = registrationService.register(request);
+        TokenResponse response = registrationService.register(request);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(response);
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<TokenResponse> login(
+            @RequestBody LoginRequest request
+    ) {
+        return ResponseEntity.ok(authService.login(request));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<TokenResponse> refresh(
+            @RequestBody RefreshRequest request
+    ) {
+        return ResponseEntity.ok(
+                tokenService.refresh(request.refreshToken())
+        );
     }
 }
