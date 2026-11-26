@@ -15,7 +15,15 @@ spring:
     show-sql: true
 
 server:
-  port: 8080
+  # HTTPS (TLS) на порту 8443; сертификат сервера выпущен собственной цепочкой CA.
+  port: 8443
+  ssl:
+    enabled: true
+    key-store: classpath:1bks24044-server.p12
+    key-store-type: PKCS12
+    # Пароль хранилища (он же пароль ключа) задаётся переменной окружения.
+    key-store-password: ${SSL_KEYSTORE_PASSWORD}
+    key-alias: "1bks24044-server"
 
 jwt:
   # Ключ HS256 задаётся переменной окружения, длина не менее 32 байт.

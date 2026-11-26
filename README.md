@@ -63,6 +63,48 @@ CRUD-операции доступны по адресам:
 настройки `jwt.access-token-ttl-seconds`, `jwt.refresh-token-ttl-seconds`
 в `application.yml`.
 
+## HTTPS (TLS) и цепочка сертификатов
+
+Сервис работает по HTTPS на порту `8443`. Цепочка сертификатов:
+
+```text
+RBPO Root CA                         (предоставлен, course-root-ca.crt)
+└── RBPO Issuing CA, alias courseca  (предоставлен, PKCS12)
+    └── 1БКС24044 Intermediate CA    (свой, CA:true, pathlen:0)
+        └── 1БКС24044 Server         (свой, SAN: localhost, 127.0.0.1)
+```
+
+- `src/main/resources/1bks24044-server.p12` — хранилище сервера (alias
+  `1bks24044-server`, цепочка из 4 сертификатов), подключено в `application.yml`;
+- `certs/*.crt` — публичные сертификаты цепочки (закрытых ключей не содержат);
+- `certs/generate-chain.sh` — воспроизводимая сборка цепочки через `keytool`.
+  Закрытые ключи и CSR скрипт оставляет в `certs/build/` (не попадает в Git).
+
+Пароль хранилища сервера задаётся переменной окружения `SSL_KEYSTORE_PASSWORD`.
+Сертификаты промежуточного и серверного уровня действуют до января 2027 года:
+срок предоставленных корня и Issuing CA ограничен 19.01.2027.
+
+### Доверие к корневому сертификату
+
+Доверенным нужно сделать только корень `certs/course-root-ca.crt`
+(SHA-256: `9A:D6:EC:24:B4:E6:18:A8:2C:4B:F7:E1:9C:8A:F3:F4:E0:22:68:03:A3:97:74:5C:98:79:F7:DC:06:11:36:DF`).
+
+- **Firefox:** Настройки → Приватность и защита → Сертификаты → Просмотр
+  сертификатов → Центры сертификации → Импортировать → `course-root-ca.crt`,
+  отметить «Доверять при идентификации веб-сайтов».
+- **Chrome / Chromium (Linux):**
+  `certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n course-root-ca -i certs/course-root-ca.crt`
+  (пакет `libnss3-tools`) и перезапуск браузера.
+- **Linux (системное хранилище, curl и др.):**
+  `sudo cp certs/course-root-ca.crt /usr/local/share/ca-certificates/ && sudo update-ca-certificates`.
+- **Windows 11:** `Win + R` → `certmgr.msc` → «Доверенные корневые центры
+  сертификации» → «Сертификаты» → «Все задачи» → «Импорт…» → `course-root-ca.crt`.
+- **Postman:** Settings → Certificates → CA Certificates → включить и выбрать
+  `course-root-ca.crt`; `baseUrl` коллекции — `https://localhost:8443`.
+
+Проверка из консоли:
+`curl --cacert certs/course-root-ca.crt https://localhost:8443/api/auth/csrf`.
+
 ## Настройка подключения
 
 Создайте в PostgreSQL базу `rbpo_db`, таблицы согласно SQL-схеме проекта
@@ -72,7 +114,9 @@ CRUD-операции доступны по адресам:
 
 - `DB_URL` — URL PostgreSQL;
 - `DB_USERNAME` — имя пользователя БД;
-- `DB_PASSWORD` — пароль пользователя БД.
+- `DB_PASSWORD` — пароль пользователя БД;
+- `JWT_SECRET` — ключ подписи JWT;
+- `SSL_KEYSTORE_PASSWORD` — пароль хранилища `1bks24044-server.p12`.
 
 По умолчанию URL указывает на `jdbc:postgresql://localhost:5432/rbpo_db`,
 а пользователь — на `rbpo_app`. Пароль должен быть задан отдельно.
@@ -82,7 +126,8 @@ CRUD-операции доступны по адресам:
 ## Запуск
 
 В IntelliJ IDEA запустите `RbpoApplication` через конфигурацию Spring Boot,
-предварительно задав необходимые переменные окружения.
+предварительно задав необходимые переменные окружения. После запуска сервис
+доступен по адресу `https://localhost:8443`.
 
 Hibernate использует режим `ddl-auto: validate`: приложение проверяет
 соответствие JPA-модели существующей схеме БД и не создаёт таблицы автоматически.

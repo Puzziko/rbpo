@@ -32,6 +32,12 @@ build/
 ### VS Code ###
 .vscode/
 
+### Closed intermediate CA key###
+certs/1bks24044-intermediate-ca.p12
+certs/build/
+certs/**/*.p12
+*.csr
+
 .env
 .env.*
 !.env.example
